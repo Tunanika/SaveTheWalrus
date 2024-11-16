@@ -96,7 +96,8 @@ const ObservationForm = () => {
         setImageUri(result.assets[0].uri);
         const exifData = await extractExifData(result.assets[0].uri);
         if (exifData) {
-          console.log("EAT MYA ASS");
+          console.log("EXIF EXISTS");
+          
         }
         setStep(2);
       }
