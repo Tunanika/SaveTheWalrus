@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -12,12 +12,24 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
+
+  useEffect(() => {
+    const loadUsername = async () => {
+      const storedUsername = await AsyncStorage.getItem("username");
+      if (storedUsername) {
+        setUsername(storedUsername);
+      }
+    };
+
+    loadUsername();
+  }, []);
 
   const handleLogin = async () => {
     setError("");
@@ -26,13 +38,8 @@ const Login = () => {
     // Simulate API call delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    if (username === "string") {
-      // Login successful - you can add your navigation logic here
-      console.log("Login successful");
-      navigation.navigate("photo");
-    } else {
-      setError("Invalid username. Please try again.");
-    }
+    await AsyncStorage.setItem("username", username);
+    navigation.navigate("photo");
 
     setIsLoading(false);
   };
