@@ -38,8 +38,8 @@ const ObservationForm = () => {
     health: "1",
     location: "",
     timestamp: new Date(),
-    username: "",
-    remarks: "",
+    user: "",
+    additional_description: "",
   });
 
   useEffect(() => {
@@ -335,7 +335,7 @@ const ObservationForm = () => {
         <Text style={styles.label}>Remarks</Text>
         <TextInput
           style={[styles.textInput, styles.remarksInput]}
-          value={formData.remarks}
+          value={formData.additional_description}
           onChangeText={(value) =>
             setFormData((prev) => ({ ...prev, remarks: value }))
           }
@@ -408,8 +408,8 @@ const ObservationForm = () => {
                   health: "1",
                   location: "",
                   timestamp: new Date(),
-                  username: username,
-                  remarks: "",
+                  user: username,
+                  additional_description: "",
                 });
                 setError("");
               }}
