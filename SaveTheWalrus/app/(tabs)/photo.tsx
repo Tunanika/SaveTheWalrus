@@ -257,7 +257,6 @@ const ObservationForm = () => {
           <DateTimePicker
             value={formData.timestamp}
             mode="datetime"
-            is24Hour={true}
             display="default"
             onChange={(event, selectedDate) => {
               setShowDatePicker(false);
