@@ -108,9 +108,9 @@ const ObservationForm = () => {
         const exifData = result.assets[0].exif;
         if (exifData && exifData.DateTimeOriginal) {
           const dateString = exifData.DateTimeOriginal.replace(
-            /:/g,
-            "-"
-          ).replace(" ", "T");
+            /^(\d{4}):(\d{2}):(\d{2})\s(.*)$/,
+            "$1-$2-$3T$4"
+          );
           const timestamp = new Date(dateString);
           setFormData((prev) => ({
             ...prev,
