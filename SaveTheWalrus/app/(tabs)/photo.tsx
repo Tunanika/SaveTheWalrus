@@ -13,7 +13,6 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
-import * as MediaLibrary from "expo-media-library";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
@@ -58,34 +57,6 @@ const ObservationForm = () => {
     getUsername();
   }, []);
 
-  // Function to extract EXIF data and location
-  const extractExifData = async (uri: any) => {
-    try {
-      // Request location permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setError(
-          "Location permission is required to record the observation location"
-        );
-        return null;
-      }
-
-      // Get current location
-      const location = await Location.getCurrentPositionAsync({});
-
-      // Get asset info
-      const asset = await MediaLibrary.createAssetAsync(uri);
-
-      return {
-        location: `${location.coords.latitude}, ${location.coords.longitude}`,
-        timestamp: asset.modificationTime,
-      };
-    } catch (err) {
-      console.error("Error extracting data:", err);
-      setError("Failed to get location data: " + err);
-      return null;
-    }
-  };
   // Helper function to convert GPS coordinates to decimal degrees
   const gpsToDecimal = (gpsData: number[]) => {
     const [degrees, minutes, seconds] = gpsData;
@@ -374,7 +345,7 @@ const ObservationForm = () => {
         />
       </View>
 
-      <View style={{ paddingBottom: 20 }}>
+      <View style={{ paddingBottom: 60 }}>
         {" "}
         {/* Add padding here */}
         <TouchableOpacity
