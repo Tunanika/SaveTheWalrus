@@ -63,7 +63,7 @@ const ExploreTab = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: 36 }]}>
       <Text style={styles.header}>Explore</Text>
       <FlatList
         data={data}
