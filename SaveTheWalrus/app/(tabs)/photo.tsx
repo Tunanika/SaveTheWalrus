@@ -86,7 +86,11 @@ const ObservationForm = () => {
       return null;
     }
   };
-
+  // Helper function to convert GPS coordinates to decimal degrees
+  const gpsToDecimal = (gpsData: number[]) => {
+    const [degrees, minutes, seconds] = gpsData;
+    return degrees + minutes / 60 + seconds / 3600;
+  };
   // Image Picker Function
   const pickImage = async () => {
     try {
@@ -98,7 +102,7 @@ const ObservationForm = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
-        exif: true,
+        exif: true, // Ensure EXIF data is included
       });
 
       if (!result.canceled) {
@@ -106,17 +110,64 @@ const ObservationForm = () => {
 
         // Extract EXIF data directly from the result
         const exifData = result.assets[0].exif;
-        if (exifData && exifData.DateTimeOriginal) {
-          const dateString = exifData.DateTimeOriginal.replace(
-            /^(\d{4}):(\d{2}):(\d{2})\s(.*)$/,
-            "$1-$2-$3T$4"
-          );
-          const timestamp = new Date(dateString);
-          setFormData((prev) => ({
-            ...prev,
-            timestamp,
-          }));
+
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+
+        if (exifData) {
+          // Extract timestamp
+          if (exifData.DateTimeOriginal) {
+            const dateString = exifData.DateTimeOriginal.replace(
+              /^(\d{4}):(\d{2}):(\d{2})\s(.*)$/,
+              "$1-$2-$3T$4"
+            );
+            const timestamp = new Date(dateString);
+            setFormData((prev) => ({
+              ...prev,
+              timestamp,
+            }));
+          }
+
+          // Extract location
+          if (
+            exifData.GPSLatitude &&
+            exifData.GPSLongitude &&
+            exifData.GPSLatitudeRef &&
+            exifData.GPSLongitudeRef
+          ) {
+            latitude =
+              (exifData.GPSLatitudeRef === "N" ? 1 : -1) *
+              gpsToDecimal(exifData.GPSLatitude);
+            longitude =
+              (exifData.GPSLongitudeRef === "E" ? 1 : -1) *
+              gpsToDecimal(exifData.GPSLongitude);
+
+            setSelectedLocation({ latitude, longitude });
+            setFormData((prev) => ({
+              ...prev,
+              location: `${latitude}, ${longitude}`,
+            }));
+          }
         }
+
+        // If EXIF location is missing, request current location
+        if (latitude === null || longitude === null) {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const location = await Location.getCurrentPositionAsync({});
+            latitude = location.coords.latitude;
+            longitude = location.coords.longitude;
+
+            setSelectedLocation({ latitude, longitude });
+            setFormData((prev) => ({
+              ...prev,
+              location: `${latitude}, ${longitude}`,
+            }));
+          } else {
+            setError("Permission to access location was denied.");
+          }
+        }
+
         setStep(2);
       }
     } catch (err) {
@@ -125,14 +176,13 @@ const ObservationForm = () => {
       setLoading(false);
     }
   };
-
   // Handle Form Submission
   const handleSubmit = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch("http://localhost:8000/observations/", {
+      const response = await fetch("http://10.30.32.210:8000/observations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -324,17 +374,21 @@ const ObservationForm = () => {
         />
       </View>
 
-      <TouchableOpacity
-        style={[styles.submitButton, loading && styles.buttonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.buttonText}>Submit Observation</Text>
-        )}
-      </TouchableOpacity>
+      <View style={{ paddingBottom: 20 }}>
+        {" "}
+        {/* Add padding here */}
+        <TouchableOpacity
+          style={[styles.submitButton, loading && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.buttonText}>Submit Observation</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 
