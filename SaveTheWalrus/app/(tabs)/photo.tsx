@@ -6,58 +6,57 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TextInput,
   ActivityIndicator,
-  Platform,
   SafeAreaView,
-  Alert,
+  TextInput,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { Picker } from "@react-native-picker/picker";
 import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import * as MediaLibrary from "expo-media-library";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Picker } from "@react-native-picker/picker";
 
 const ObservationForm = () => {
   const [step, setStep] = useState(1);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [username, setUsername] = useState<string>("");
+
   const [formData, setFormData] = useState({
     species: "",
-    observed_count: "",
+    observed_count: "1",
     gender: "",
     age: "",
     health: "1",
     location: "",
-    timestamp: new Date().toISOString(),
-    user: "",
-    additional_description: "",
-    date: new Date().toISOString().split("T")[0], // Initialize with current date
-    time: new Date().toTimeString().split(" ")[0], // Initialize with current time
+    timestamp: new Date(),
+    username: "",
+    remarks: "",
   });
 
   useEffect(() => {
-    (async () => {
-      // Request permissions for image and location
-      if (Platform.OS !== "web") {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          alert("Sorry, we need camera roll permissions to make this work!");
+    const getUsername = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem("username");
+        if (storedUsername) {
+          setUsername(storedUsername);
+          setFormData((prev) => ({ ...prev, username: storedUsername }));
         }
+      } catch (error) {
+        console.error("Error fetching username:", error);
       }
-      const username = await AsyncStorage.getItem("username");
-      if (username) {
-        setFormData((prev) => ({ ...prev, user: username }));
-      }
-    })();
+    };
+    getUsername();
   }, []);
 
-  const extractExifData = async (uri: string) => {
+  // Function to extract EXIF data and location
+  const extractExifData = async (uri: any) => {
     try {
+      // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         setError(
@@ -66,12 +65,15 @@ const ObservationForm = () => {
         return null;
       }
 
+      // Get current location
       const location = await Location.getCurrentPositionAsync({});
+
+      // Get asset info
       const asset = await MediaLibrary.createAssetAsync(uri);
 
       return {
         location: `${location.coords.latitude}, ${location.coords.longitude}`,
-        timestamp: asset.modificationTime || new Date().toISOString(),
+        timestamp: asset.modificationTime || Date.now(),
       };
     } catch (err) {
       console.error("Error extracting data:", err);
@@ -80,6 +82,7 @@ const ObservationForm = () => {
     }
   };
 
+  // Image Picker Function
   const pickImage = async () => {
     try {
       setLoading(true);
@@ -94,11 +97,17 @@ const ObservationForm = () => {
 
       if (!result.canceled) {
         setImageUri(result.assets[0].uri);
+
+        // Extract EXIF data
         const exifData = await extractExifData(result.assets[0].uri);
         if (exifData) {
-          console.log("EXIF EXISTS");
-          
+          setFormData((prev) => ({
+            ...prev,
+            location: "BOK",
+            timestamp: Date.now(),
+          }));
         }
+
         setStep(2);
       }
     } catch (err) {
@@ -108,6 +117,7 @@ const ObservationForm = () => {
     }
   };
 
+  // Handle Form Submission
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -125,15 +135,175 @@ const ObservationForm = () => {
         throw new Error("Failed to submit observation");
       }
 
-      Alert.alert("Success", "Observation submitted successfully!");
       setStep(3);
     } catch (err) {
-      Alert.alert("Error", err instanceof Error ? err.message : String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   };
 
+  // Render the Observation Form
+  const renderForm = () => (
+    <ScrollView style={styles.formContainer}>
+      {imageUri && (
+        <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+      )}
+
+      {/* Species Dropdown */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Species *</Text>
+        <Picker
+          selectedValue={formData.species}
+          onValueChange={(value) =>
+            setFormData((prev) => ({ ...prev, species: value }))
+          }
+          style={styles.picker}
+        >
+          <Picker.Item label="Select species" value="" />
+          <Picker.Item label="Fallow deer (damhert)" value="damhert" />
+          <Picker.Item label="Red deer (edelhert)" value="edelhert" />
+          <Picker.Item label="Roe deer (ree)" value="ree" />
+          <Picker.Item label="Wild boar" value="wild_boar" />
+          <Picker.Item
+            label="Scottish Highlander"
+            value="scottish_highlander"
+          />
+          <Picker.Item label="Wolf" value="wolf" />
+        </Picker>
+      </View>
+
+      {/* Number of Animals Input */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Number of Animals *</Text>
+        <TextInput
+          style={styles.textInput}
+          value={formData.observed_count}
+          onChangeText={(value) =>
+            setFormData((prev) => ({ ...prev, observed_count: value }))
+          }
+          keyboardType="numeric"
+          placeholder="Enter number of animals"
+        />
+      </View>
+
+      {/* Gender Dropdown */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Gender</Text>
+        <Picker
+          selectedValue={formData.gender}
+          onValueChange={(value) =>
+            setFormData((prev) => ({ ...prev, gender: value }))
+          }
+          style={styles.picker}
+        >
+          <Picker.Item label="Select gender" value="" />
+          <Picker.Item label="Female" value="female" />
+          <Picker.Item label="Male" value="male" />
+          <Picker.Item label="Unknown" value="unknown" />
+        </Picker>
+      </View>
+
+      {/* Age Dropdown */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Age</Text>
+        <Picker
+          selectedValue={formData.age}
+          onValueChange={(value) =>
+            setFormData((prev) => ({ ...prev, age: value }))
+          }
+          style={styles.picker}
+        >
+          <Picker.Item label="Select age" value="" />
+          <Picker.Item label="Adolescent" value="adolescent" />
+          <Picker.Item label="Adult" value="adult" />
+          <Picker.Item label="Unknown" value="unknown" />
+        </Picker>
+      </View>
+
+      {/* Health Score Dropdown */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Health Score</Text>
+        <Picker
+          selectedValue={formData.health}
+          onValueChange={(value) =>
+            setFormData((prev) => ({ ...prev, health: value }))
+          }
+          style={styles.picker}
+        >
+          <Picker.Item label="Select health score" value="" />
+          <Picker.Item label="1 (Poor)" value="1" />
+          <Picker.Item label="2 (Fair)" value="2" />
+          <Picker.Item label="3 (Good)" value="3" />
+          <Picker.Item label="4 (Very Good)" value="4" />
+          <Picker.Item label="5 (Excellent)" value="5" />
+          <Picker.Item label="Unknown" value="unknown" />
+        </Picker>
+      </View>
+
+      {/* Date and Time Picker */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Date and Time of Observation</Text>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowDatePicker(true)}
+        >
+          <Text style={styles.dateButtonText}>
+            {formData.timestamp.toLocaleString()}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={formData.timestamp}
+            mode="datetime"
+            is24Hour={true}
+            display="default"
+            onChange={(event, selectedDate) => {
+              setShowDatePicker(false);
+              if (selectedDate) {
+                setFormData((prev) => ({ ...prev, timestamp: selectedDate }));
+              }
+            }}
+          />
+        )}
+      </View>
+
+      {/* Username Display */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Username</Text>
+        <Text style={styles.usernameText}>{username}</Text>
+      </View>
+
+      {/* Remarks Input */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Remarks</Text>
+        <TextInput
+          style={[styles.textInput, styles.remarksInput]}
+          value={formData.remarks}
+          onChangeText={(value) =>
+            setFormData((prev) => ({ ...prev, remarks: value }))
+          }
+          placeholder="Enter any additional remarks"
+          multiline={true}
+          numberOfLines={4}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.submitButton, loading && styles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.buttonText}>Submit Observation</Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+
+  // Render the appropriate step
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -147,152 +317,17 @@ const ObservationForm = () => {
               <Ionicons name="camera" size={50} color="#4a5568" />
               <Text style={styles.uploadText}>Tap to select an image</Text>
             </TouchableOpacity>
-          </View>
-        );
-
-      case 2:
-        return (
-          <ScrollView style={styles.formContainer}>
-            {imageUri && (
-              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-            )}
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Animal Species</Text>
-              <Picker
-                selectedValue={formData.species}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, species: value }))
-                }
-                style={styles.picker}
-              >
-                <Picker.Item label="Select a species" value="" />
-                <Picker.Item label="Fallow Deer (Damhert)" value="Damhert" />
-                <Picker.Item label="Red Deer (Edelhert)" value="Edelhert" />
-                <Picker.Item label="Roe Deer (Ree)" value="Ree" />
-                <Picker.Item label="Wild Boar" value="Wild_Boar" />
-                <Picker.Item
-                  label="Scottish Highlander"
-                  value="Scottish_Highlander"
-                />
-                <Picker.Item label="Wolf" value="Wolf" />
-              </Picker>
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Number of Animals</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                value={formData.observed_count}
-                onChangeText={(value) =>
-                  setFormData((prev) => ({ ...prev, observed_count: value }))
-                }
-              />
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Gender</Text>
-              <Picker
-                selectedValue={formData.gender}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, gender: value }))
-                }
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Gender" value="" />
-                <Picker.Item label="Female" value="Female" />
-                <Picker.Item label="Male" value="Male" />
-                <Picker.Item label="Unknown" value="Unknown" />
-              </Picker>
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Age</Text>
-              <Picker
-                selectedValue={formData.age}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, age: value }))
-                }
-                style={styles.picker}
-              >
-                <Picker.Item label="Select Age" value="" />
-                <Picker.Item label="Adolescent" value="Adolescent" />
-                <Picker.Item label="Adult" value="Adult" />
-                <Picker.Item label="Unknown" value="Unknown" />
-              </Picker>
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Health</Text>
-              <Picker
-                selectedValue={formData.health}
-                onValueChange={(value) =>
-                  setFormData((prev) => ({ ...prev, health: value }))
-                }
-                style={styles.picker}
-              >
-                <Picker.Item label="1" value="1" />
-                <Picker.Item label="2" value="2" />
-                <Picker.Item label="3" value="3" />
-                <Picker.Item label="4" value="4" />
-                <Picker.Item label="5" value="5" />
-                <Picker.Item label="Unknown" value="Unknown" />
-              </Picker>
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Date</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.date}
-                onChangeText={(value) =>
-                  setFormData((prev) => ({ ...prev, date: value }))
-                }
-              />
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Time</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.time}
-                onChangeText={(value) =>
-                  setFormData((prev) => ({ ...prev, time: value }))
-                }
-              />
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.label}>Remarks</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                multiline
-                numberOfLines={4}
-                value={formData.additional_description}
-                onChangeText={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    additional_description: value,
-                  }))
-                }
-              />
-            </View>
-
             <TouchableOpacity
-              style={[styles.submitButton, loading && styles.buttonDisabled]}
-              onPress={handleSubmit}
+              style={styles.skipButton}
+              onPress={() => setStep(2)}
               disabled={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.buttonText}>Submit Observation</Text>
-              )}
+              <Text style={styles.skipButtonText}>Skip</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         );
-
+      case 2:
+        return renderForm();
       case 3:
         return (
           <View style={styles.successContainer}>
@@ -305,12 +340,26 @@ const ObservationForm = () => {
               onPress={() => {
                 setStep(1);
                 setImageUri(null);
+                setFormData({
+                  species: "",
+                  observed_count: "1",
+                  gender: "",
+                  age: "",
+                  health: "1",
+                  location: "",
+                  timestamp: new Date(),
+                  username: username,
+                  remarks: "",
+                });
+                setError("");
               }}
             >
               <Text style={styles.buttonText}>Submit Another Observation</Text>
             </TouchableOpacity>
           </View>
         );
+      default:
+        return null;
     }
   };
 
@@ -362,6 +411,7 @@ const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   uploadButton: {
@@ -373,11 +423,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 40,
     backgroundColor: "white",
+    width: "100%",
   },
   uploadText: {
     marginTop: 12,
     fontSize: 16,
     color: "#4a5568",
+  },
+  skipButton: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  skipButtonText: {
+    color: "#3b82f6",
+    fontSize: 16,
+    textDecorationLine: "underline",
   },
   formContainer: {
     padding: 20,
@@ -402,6 +462,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+  },
+  textInput: {
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 12,
+    fontSize: 16,
+  },
+  remarksInput: {
+    height: 100,
+    textAlignVertical: "top",
+  },
+  dateButton: {
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    padding: 12,
+    justifyContent: "center",
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: "#1a202c",
+  },
+  usernameText: {
+    fontSize: 16,
+    color: "#4a5568",
   },
   submitButton: {
     backgroundColor: "#3b82f6",
@@ -442,6 +530,7 @@ const styles = StyleSheet.create({
     color: "#1a202c",
     marginTop: 16,
     marginBottom: 24,
+    textAlign: "center",
   },
   newObservationButton: {
     backgroundColor: "#3b82f6",
@@ -449,26 +538,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     width: "100%",
-  },
-  input: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 12,
-    fontSize: 16,
-    color: "#1a202c",
-  },
-  textArea: {
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 12,
-    fontSize: 16,
-    color: "#1a202c",
-    height: 100,
-    textAlignVertical: "top",
   },
 });
 
