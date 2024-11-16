@@ -10,12 +10,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // Assuming you're using Expo
+import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const navigation = useNavigation();
 
   const handleLogin = async () => {
     setError("");
@@ -27,8 +29,7 @@ const Login = () => {
     if (username === "string") {
       // Login successful - you can add your navigation logic here
       console.log("Login successful");
-      // You would typically navigate here
-      // navigation.navigate('Home');
+      navigation.navigate("photo");
     } else {
       setError("Invalid username. Please try again.");
     }
