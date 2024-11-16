@@ -215,6 +215,7 @@ const ObservationForm = () => {
           style={styles.picker}
         >
           <Picker.Item label="Select age" value="" />
+          <Picker.Item label="Young" value="young" />
           <Picker.Item label="Adolescent" value="adolescent" />
           <Picker.Item label="Adult" value="adult" />
           <Picker.Item label="Unknown" value="unknown" />
