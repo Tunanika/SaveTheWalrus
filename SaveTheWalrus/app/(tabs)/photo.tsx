@@ -17,6 +17,7 @@ import * as MediaLibrary from "expo-media-library";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
+import MapView, { Marker } from "react-native-maps";
 
 const ObservationForm = () => {
   const [step, setStep] = useState(1);
@@ -25,6 +26,10 @@ const ObservationForm = () => {
   const [error, setError] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [username, setUsername] = useState<string>("");
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     species: "",
@@ -73,7 +78,7 @@ const ObservationForm = () => {
 
       return {
         location: `${location.coords.latitude}, ${location.coords.longitude}`,
-        timestamp: asset.modificationTime || Date.now(),
+        timestamp: asset.modificationTime,
       };
     } catch (err) {
       console.error("Error extracting data:", err);
@@ -93,21 +98,25 @@ const ObservationForm = () => {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 1,
+        exif: true,
       });
 
       if (!result.canceled) {
         setImageUri(result.assets[0].uri);
 
-        // Extract EXIF data
-        const exifData = await extractExifData(result.assets[0].uri);
-        if (exifData) {
+        // Extract EXIF data directly from the result
+        const exifData = result.assets[0].exif;
+        if (exifData && exifData.DateTimeOriginal) {
+          const dateString = exifData.DateTimeOriginal.replace(
+            /:/g,
+            "-"
+          ).replace(" ", "T");
+          const timestamp = new Date(dateString);
           setFormData((prev) => ({
             ...prev,
-            location: "BOK",
-            timestamp: Date.now(),
+            timestamp,
           }));
         }
-
         setStep(2);
       }
     } catch (err) {
@@ -268,6 +277,32 @@ const ObservationForm = () => {
         )}
       </View>
 
+      {/* Observation Location */}
+      <View style={styles.formField}>
+        <Text style={styles.label}>Observation Location</Text>
+        <MapView
+          style={styles.map}
+          initialRegion={{
+            latitude: selectedLocation ? selectedLocation.latitude : 37.78825,
+            longitude: selectedLocation
+              ? selectedLocation.longitude
+              : -122.4324,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          }}
+          onPress={(e) => {
+            const { latitude, longitude } = e.nativeEvent.coordinate;
+            setSelectedLocation({ latitude, longitude });
+            setFormData((prev) => ({
+              ...prev,
+              location: `${latitude}, ${longitude}`,
+            }));
+          }}
+        >
+          {selectedLocation && <Marker coordinate={selectedLocation} />}
+        </MapView>
+      </View>
+
       {/* Username Display */}
       <View style={styles.formField}>
         <Text style={styles.label}>Username</Text>
@@ -389,6 +424,11 @@ const ObservationForm = () => {
 };
 
 const styles = StyleSheet.create({
+  map: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+  },
   container: {
     flex: 1,
     backgroundColor: "#f7fafc",
